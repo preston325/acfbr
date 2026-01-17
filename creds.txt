@@ -1,0 +1,11 @@
+The Sports DB API
+
+https://www.thesportsdb.com/
+API_KEY 428457
+
+gmail: americas.cfb.rankings@gmail.com
+pword: ESPNSucks!!!
+
+Brevo - Email Service
+uname: americas.cfb.rankings@gmail.com
+pwword: Ironman2015!

@@ -6,13 +6,19 @@ I intend to build a mobile-app and a web-app to interact with notable podcasters
 The app will be a mobile-first app that uses React Native (mobile) + Next.js (web/public pages).
 
 The following pages will be necessary: 
-    landing page:
-        landing page will descrip 
-    registration page, 
-    signin page, 
-    ballot casting page,
-    public page to display top 25 ranked team in the database according to votes cast by registered users, 
+    landing page: this will be the description and purpose of our app with signin and registration links.
+    registration page: seperate page that has a web-form to gather user's Name, Email, Password, and Password confirmation.
+    signin page: separate page with 2 field web form to authenticate user's Email and Password combo 
+    ballot casting page: This page is located behind the login page with a log of each college football team than can be dragged into a ranking "slot" based on the opinion of the logged in user.
+    Ranking page public page to display top 25 ranked team in the database according to votes cast by registered users. 
 
 A Postgress Database will be required to manage user registration, user signins, ballott casting
 
 I will need use of the balldontlie NCAAF api to get current rankings for comparison.
+
+https://www.thesportsdb.com/league/4479-ncaa-division-1
+
+This needs to be a docker container solution with one container for the app and one for the postgress database.
+
+
+
