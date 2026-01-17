@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
 
     if (result.rows.length === 0) {
       return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
+        { error: 'email_not_found', message: 'No registered user found with this email address.' },
+        { status: 404 }
       );
     }
 

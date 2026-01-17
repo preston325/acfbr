@@ -17,9 +17,8 @@ export default function SignInPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
-  const [resendEmail, setResendEmail] = useState('');
   const [resendStatus, setResendStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [showResendForm, setShowResendForm] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   useEffect(() => {
     // Prioritize verification message over success message
@@ -73,11 +72,12 @@ export default function SignInPage() {
       if (response.ok) {
         router.push('/ballot');
       } else {
-        // Check if it's an email verification error
-        if (response.status === 403 && data.error?.includes('verify your email')) {
+        // Check if email doesn't exist
+        if (response.status === 404 && data.error === 'email_not_found') {
+          setErrors({ submit: data.message || 'No registered user found with this email address.' });
+        } else if (response.status === 403 && (data.error?.includes('verify your email') || data.error?.includes('verification'))) {
+          // Check if it's an email verification error
           setErrors({ submit: data.error });
-          setShowResendForm(true);
-          setResendEmail(formData.email);
         } else {
           setErrors({ submit: data.error || 'Invalid email or password' });
         }
@@ -89,14 +89,18 @@ export default function SignInPage() {
     }
   };
 
-  const handleResendVerification = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setResendStatus(null);
-
-    if (!resendEmail) {
-      setResendStatus({ type: 'error', message: 'Please enter your email address' });
+  const handleResendVerification = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    
+    if (!formData.email) {
+      setResendStatus({ type: 'error', message: 'Please enter your email address first' });
       return;
     }
+
+    setResendStatus(null);
+    setIsResending(true);
 
     try {
       const response = await fetch('/api/auth/resend-verification', {
@@ -104,7 +108,7 @@ export default function SignInPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: resendEmail }),
+        body: JSON.stringify({ email: formData.email }),
       });
 
       const data = await response.json();
@@ -112,7 +116,6 @@ export default function SignInPage() {
       if (response.ok) {
         setResendStatus({ type: 'success', message: data.message || 'Verification email sent! Please check your inbox.' });
         setTimeout(() => {
-          setShowResendForm(false);
           setResendStatus(null);
         }, 5000);
       } else {
@@ -120,6 +123,8 @@ export default function SignInPage() {
       }
     } catch (error) {
       setResendStatus({ type: 'error', message: 'An error occurred. Please try again.' });
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -199,66 +204,50 @@ export default function SignInPage() {
             </div>
           </div>
 
-          {errors.submit && <div className="error" style={{ marginBottom: '20px' }}>{errors.submit}</div>}
+          {errors.submit && (
+            <div className="error" style={{ marginBottom: '20px' }}>
+              {errors.submit}
+              {formData.email && !errors.submit.includes('No registered user') && (
+                <div style={{ marginTop: '10px', fontSize: '14px' }}>
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={isResending}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#0066cc',
+                      cursor: isResending ? 'not-allowed' : 'pointer',
+                      textDecoration: 'underline',
+                      padding: 0,
+                      fontSize: '14px',
+                      opacity: isResending ? 0.6 : 1,
+                    }}
+                  >
+                    {isResending ? 'Sending...' : 'Resend verification email'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <button type="submit" className="btn" style={{ width: '100%' }} disabled={isSubmitting}>
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        {showResendForm && (
-          <div style={{ marginTop: '20px', padding: '20px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #dee2e6' }}>
-            <h3 style={{ fontSize: '18px', marginBottom: '10px' }}>Resend Verification Email</h3>
-            <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
-              Didn't receive the verification email? Enter your email address below and we'll send you a new one.
-            </p>
-            <form onSubmit={handleResendVerification}>
-              <div className="form-group">
-                <label htmlFor="resend-email">Email</label>
-                <input
-                  type="email"
-                  id="resend-email"
-                  value={resendEmail}
-                  onChange={(e) => setResendEmail(e.target.value)}
-                  required
-                />
-              </div>
-              {resendStatus && (
-                <div
-                  className={resendStatus.type === 'success' ? 'success' : 'error'}
-                  style={{
-                    marginBottom: '15px',
-                    padding: '10px',
-                    borderRadius: '4px',
-                    background: resendStatus.type === 'success' ? '#d4edda' : '#f8d7da',
-                    color: resendStatus.type === 'success' ? '#155724' : '#721c24',
-                  }}
-                >
-                  {resendStatus.message}
-                </div>
-              )}
-              <button type="submit" className="btn btn-secondary" style={{ width: '100%', marginBottom: '10px' }}>
-                Resend Verification Email
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowResendForm(false);
-                  setResendStatus(null);
-                }}
-                style={{
-                  width: '100%',
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#666',
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                  fontSize: '14px',
-                }}
-              >
-                Cancel
-              </button>
-            </form>
+        {resendStatus && (
+          <div
+            className={resendStatus.type === 'success' ? 'success' : 'error'}
+            style={{
+              marginTop: '20px',
+              padding: '10px',
+              borderRadius: '4px',
+              background: resendStatus.type === 'success' ? '#d4edda' : '#f8d7da',
+              color: resendStatus.type === 'success' ? '#155724' : '#721c24',
+            }}
+          >
+            {resendStatus.message}
           </div>
         )}
 
