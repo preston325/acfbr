@@ -62,7 +62,7 @@ export default function BallotPeriodsPage() {
 
   if (isLoading) {
     return (
-      <div className="container" style={{ textAlign: 'center', marginTop: '60px' }}>
+      <div className="container" style={{ textAlign: 'center', marginTop: '20px' }}>
         <p>Loading ballot periods...</p>
       </div>
     );
@@ -70,14 +70,14 @@ export default function BallotPeriodsPage() {
 
   if (error) {
     return (
-      <div className="container" style={{ textAlign: 'center', marginTop: '60px' }}>
+      <div className="container" style={{ textAlign: 'center', marginTop: '20px' }}>
         <div className="error">{error}</div>
       </div>
     );
   }
 
   return (
-    <div className="container" style={{ maxWidth: '1200px', marginTop: '60px' }}>
+    <div className="container" style={{ maxWidth: '1200px', marginTop: '20px' }}>
       <header style={{ marginBottom: '40px', textAlign: 'center' }}>
         <h1 style={{ fontSize: '48px', marginBottom: '20px' }}>Ballot Periods - 2025</h1>
         <p style={{ fontSize: '18px', color: '#666' }}>

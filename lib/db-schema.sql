@@ -87,10 +87,10 @@ CREATE INDEX IF NOT EXISTS idx_teams_ncaa_d1_football_id_team ON teams_ncaa_d1_f
 CREATE TABLE IF NOT EXISTS ballots (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  ballot_period_id INTEGER NOT NULL REFERENCES ballot_periods(id) ON DELETE CASCADE,
+  ballot_period_id INTEGER REFERENCES ballot_periods(id) ON DELETE CASCADE,
   ballot_type_id INTEGER NOT NULL REFERENCES ballot_types(id) ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(user_id, ballot_period_id, ballot_type_id)
 );
 

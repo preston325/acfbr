@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -365,14 +365,17 @@ function RankingPlaceholder({ rank, team, onRemove }: RankingPlaceholderProps) {
 export default function BallotPage() {
   const router = useRouter();
   const [teams, setTeams] = useState<Team[]>([]);
-  const [rankedTeams, setRankedTeams] = useState<(Team | undefined)[]>([]);
+  const [rankedTeams, setRankedTeams] = useState<(Team | undefined)[]>(new Array(25).fill(undefined));
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<number | string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [currentPeriodName, setCurrentPeriodName] = useState<string | null>(null);
+  const [pollOpenDt, setPollOpenDt] = useState<string | null>(null);
+  const [pollCloseDt, setPollCloseDt] = useState<string | null>(null);
 
   // Helper function to sort teams alphabetically
   const sortTeamsAlphabetically = (teamsToSort: Team[]): Team[] => {
@@ -431,7 +434,15 @@ export default function BallotPage() {
   );
 
   useEffect(() => {
-    fetchTeams();
+    const initializeData = async () => {
+      const loadedTeams = await fetchTeams();
+      // Wait a bit for state to update
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await loadSavedRankings(loadedTeams);
+      await fetchCurrentPeriod();
+    };
+    initializeData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-hide warning after 3 seconds
@@ -444,6 +455,34 @@ export default function BallotPage() {
     }
   }, [warning]);
 
+  // Helper function to check if polls are currently open
+  const isPollOpen = (): boolean => {
+    if (!pollOpenDt || !pollCloseDt) {
+      return false;
+    }
+    const now = new Date();
+    const pollOpen = new Date(pollOpenDt);
+    const pollClose = new Date(pollCloseDt);
+    return now >= pollOpen && now <= pollClose;
+  };
+
+  const fetchCurrentPeriod = async () => {
+    try {
+      const response = await fetch('/api/ballot-periods/current');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.period && data.period.period_name) {
+          setCurrentPeriodName(data.period.period_name);
+          setPollOpenDt(data.period.poll_open_dt || null);
+          setPollCloseDt(data.period.poll_close_dt || null);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching current period:', err);
+      // Don't set error state for this, just use default button text
+    }
+  };
+
   const fetchTeams = async () => {
     try {
       const response = await fetch('/api/teams');
@@ -451,16 +490,133 @@ export default function BallotPage() {
         const data = await response.json();
         const sortedTeams = sortTeamsAlphabetically(data.teams || []);
         setTeams(sortedTeams);
-        setAvailableTeams(sortedTeams);
+        // Don't set availableTeams here - let loadSavedRankings handle it
+        // This prevents overwriting the filtered list
+        return sortedTeams;
       } else if (response.status === 401) {
         router.push('/signin');
+        return [];
       } else {
         setError('Failed to load teams');
+        return [];
       }
     } catch (err) {
       setError('An error occurred while loading teams');
+      return [];
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadSavedRankings = async (loadedTeams?: Team[]) => {
+    try {
+      console.log('Loading saved rankings...');
+      const response = await fetch('/api/ballot');
+      console.log('Ballot API response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        const savedRankings = data.rankings || [];
+        
+        console.log('Saved rankings from API:', savedRankings);
+        console.log('Number of saved rankings:', savedRankings.length);
+        
+        // Use provided teams or current state
+        const currentTeams = loadedTeams && loadedTeams.length > 0 ? loadedTeams : teams;
+        console.log('Current teams available:', currentTeams.length);
+        
+        if (savedRankings.length > 0 && currentTeams.length > 0) {
+          // Sort rankings by rank to process them in order
+          const sortedRankings = [...savedRankings].sort((a, b) => a.rank - b.rank);
+          
+          // Start with all teams in available and empty rankings
+          let newRankedTeams: (Team | undefined)[] = new Array(25).fill(undefined);
+          let newAvailableTeams = [...currentTeams];
+          
+          // Process each saved ranking
+          sortedRankings.forEach((ranking: { teamId: number; rank: number; team: Team }) => {
+            const targetRank = ranking.rank - 1; // Convert to 0-indexed
+            
+            console.log(`Processing ranking: teamId=${ranking.teamId}, rank=${ranking.rank}, targetRank=${targetRank}`, ranking.team);
+            
+            if (targetRank >= 0 && targetRank < 25 && ranking.team && ranking.team.id) {
+              // Check if team is already in rankings at a different position
+              const existingRankIndex = newRankedTeams.findIndex(t => t && t.id === ranking.teamId);
+              
+              if (existingRankIndex >= 0) {
+                // Team is already ranked - clear its current position
+                console.log(`Team ${ranking.teamId} already at rank ${existingRankIndex + 1}, clearing it`);
+                newRankedTeams[existingRankIndex] = undefined;
+              }
+              
+              // Remove team from available teams if it exists there
+              const teamIndex = newAvailableTeams.findIndex(t => t.id === ranking.teamId);
+              if (teamIndex >= 0) {
+                console.log(`Removing team ${ranking.teamId} from available teams`);
+                newAvailableTeams = newAvailableTeams.filter(t => t.id !== ranking.teamId);
+              }
+              
+              // If target slot is occupied by a different team, move that team back to available
+              if (newRankedTeams[targetRank] && newRankedTeams[targetRank]!.id !== ranking.teamId) {
+                const displacedTeam = newRankedTeams[targetRank];
+                console.log(`Displacing team ${displacedTeam!.id} from rank ${targetRank + 1}`);
+                if (displacedTeam) {
+                  // Only add back if not already in available
+                  if (!newAvailableTeams.some(t => t.id === displacedTeam.id)) {
+                    newAvailableTeams.push(displacedTeam);
+                  }
+                }
+              }
+              
+              // Place team in target rank (use the team object from the ranking data)
+              console.log(`Placing team ${ranking.teamId} at rank ${targetRank + 1}`);
+              newRankedTeams[targetRank] = ranking.team;
+            } else {
+              console.warn(`Invalid ranking data: targetRank=${targetRank}, team=`, ranking.team);
+            }
+          });
+          
+          // Sort available teams alphabetically
+          newAvailableTeams = sortTeamsAlphabetically(newAvailableTeams);
+          
+          const rankedCount = newRankedTeams.filter((t): t is Team => t !== undefined).length;
+          console.log(`Auto-populated ${rankedCount} ranked teams:`, newRankedTeams.filter((t): t is Team => t !== undefined));
+          console.log(`Remaining ${newAvailableTeams.length} available teams`);
+          
+          // Update state
+          setRankedTeams(newRankedTeams);
+          setAvailableTeams(newAvailableTeams);
+        } else {
+          console.log('No saved rankings found or teams not loaded', {
+            savedRankingsLength: savedRankings.length,
+            currentTeamsLength: currentTeams.length
+          });
+          // If no saved rankings, set all teams as available
+          if (currentTeams.length > 0) {
+            setAvailableTeams(sortTeamsAlphabetically(currentTeams));
+          }
+        }
+      } else if (response.status === 401) {
+        router.push('/signin');
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to load saved rankings:', response.status, response.statusText, errorText);
+        // On error, ensure availableTeams is set
+        if (loadedTeams && loadedTeams.length > 0) {
+          setAvailableTeams(sortTeamsAlphabetically(loadedTeams));
+        } else if (teams.length > 0) {
+          setAvailableTeams(sortTeamsAlphabetically(teams));
+        }
+      }
+    } catch (err) {
+      // Log error details
+      console.error('Error loading saved rankings:', err);
+      // On error, ensure availableTeams is set
+      if (loadedTeams && loadedTeams.length > 0) {
+        setAvailableTeams(sortTeamsAlphabetically(loadedTeams));
+      } else if (teams.length > 0) {
+        setAvailableTeams(sortTeamsAlphabetically(teams));
+      }
     }
   };
 
@@ -730,15 +886,81 @@ export default function BallotPage() {
     });
   };
 
+  const handleSave = async () => {
+    // Build rankings array using actual slot positions (not filtered indices)
+    const rankings = rankedTeams
+      .map((team, index) => {
+        if (team) {
+          return {
+            teamId: team.id,
+            rank: index + 1, // rank is the slot position (1-indexed)
+          };
+        }
+        return null;
+      })
+      .filter((r): r is { teamId: number; rank: number } => r !== null);
+
+    if (rankings.length === 0) {
+      setWarning('At least one team needs to be selected');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    setWarning(null);
+
+    try {
+      const response = await fetch('/api/ballot', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rankings,
+        }),
+      });
+
+      if (response.ok) {
+        setSuccess('Rankings Saved Successfully');
+        setTimeout(() => {
+          setSuccess(null);
+        }, 3000);
+      } else if (response.status === 401) {
+        router.push('/signin');
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to save ballot');
+      }
+    } catch (err) {
+      setError('An error occurred while saving your ballot');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async () => {
-    const validRankedTeams = rankedTeams.filter((t): t is Team => t !== undefined);
-    if (validRankedTeams.length === 0) {
+    // Build rankings array using actual slot positions (not filtered indices)
+    const rankings = rankedTeams
+      .map((team, index) => {
+        if (team) {
+          return {
+            teamId: team.id,
+            rank: index + 1, // rank is the slot position (1-indexed)
+          };
+        }
+        return null;
+      })
+      .filter((r): r is { teamId: number; rank: number } => r !== null);
+
+    if (rankings.length === 0) {
       setError('Please rank at least one team');
       return;
     }
 
     setIsSubmitting(true);
     setError(null);
+    setSuccess(null);
 
     try {
       const response = await fetch('/api/ballot', {
@@ -747,18 +969,15 @@ export default function BallotPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          rankings: validRankedTeams.map((team, index) => ({
-            teamId: team.id,
-            rank: index + 1,
-          })),
+          rankings,
         }),
       });
 
       if (response.ok) {
-        setSuccess(true);
+        setSuccess('Ballot Cast Successfully');
         setTimeout(() => {
-          router.push('/rankings');
-        }, 2000);
+          setSuccess(null);
+        }, 3000);
       } else if (response.status === 401) {
         router.push('/signin');
       } else {
@@ -774,14 +993,14 @@ export default function BallotPage() {
 
   if (isLoading) {
     return (
-      <div className="container" style={{ textAlign: 'center', marginTop: '60px' }}>
+      <div className="container" style={{ textAlign: 'center', marginTop: '20px' }}>
         <p>Loading teams...</p>
       </div>
     );
   }
 
   return (
-    <div className="container" style={{ maxWidth: '1400px', marginTop: '60px' }}>
+    <div className="container" style={{ maxWidth: '1400px', marginTop: '20px' }}>
       <header style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: '36px' }}>Your Ballot</h1>
         <div>
@@ -820,7 +1039,7 @@ export default function BallotPage() {
 
       {success && (
         <div className="success" style={{ padding: '15px', background: '#d4edda', borderRadius: '6px', marginBottom: '20px' }}>
-          Ballot submitted successfully! Redirecting to rankings...
+          {success}
         </div>
       )}
 
@@ -832,9 +1051,87 @@ export default function BallotPage() {
       >
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
           <div>
-            <h2 style={{ fontSize: '24px', marginBottom: '20px' }}>
-              Your Top 25 Rankings ({rankedTeams.filter((t): t is Team => t !== undefined).length}/25)
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '24px', margin: 0 }}>
+                Your Top 25 Rankings ({rankedTeams.filter((t): t is Team => t !== undefined).length}/25)
+              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={handleSave}
+                  className="btn"
+                  style={{ minWidth: '140px' }}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Saving...' : 'Save Rankings'}
+                </button>
+                <div
+                  style={{
+                    position: 'relative',
+                    display: 'inline-block',
+                    cursor: 'help',
+                  }}
+                  onMouseEnter={(e) => {
+                    const tooltip = e.currentTarget.querySelector('[data-tooltip]') as HTMLElement;
+                    if (tooltip) tooltip.style.opacity = '1';
+                  }}
+                  onMouseLeave={(e) => {
+                    const tooltip = e.currentTarget.querySelector('[data-tooltip]') as HTMLElement;
+                    if (tooltip) tooltip.style.opacity = '0';
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      background: '#0066cc',
+                      color: 'white',
+                      textAlign: 'center',
+                      lineHeight: '20px',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    ?
+                  </span>
+                  <div
+                    data-tooltip
+                    style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      marginBottom: '8px',
+                      padding: '8px 12px',
+                      background: '#333',
+                      color: 'white',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      opacity: 0,
+                      pointerEvents: 'none',
+                      transition: 'opacity 0.2s',
+                      zIndex: 1000,
+                      width: '280px',
+                      whiteSpace: 'normal',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Save Rankings does not cast your ballot. It only saves your rankings to be worked on later.
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        border: '6px solid transparent',
+                        borderTopColor: '#333',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
             <SortableContext 
               items={rankedTeams.filter((t): t is Team => t !== undefined).map(t => t.id)} 
               strategy={verticalListSortingStrategy}
@@ -854,15 +1151,107 @@ export default function BallotPage() {
                 })}
               </div>
             </SortableContext>
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
-              <button
-                onClick={handleSubmit}
-                className="btn"
-                style={{ minWidth: '150px' }}
-                disabled={isSubmitting || rankedTeams.filter((t): t is Team => t !== undefined).length === 0}
-              >
-                {isSubmitting ? 'Submitting...' : 'Cast Ballot'}
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={handleSubmit}
+                  className="btn"
+                  style={{ minWidth: '150px' }}
+                  disabled={isSubmitting || rankedTeams.filter((t): t is Team => t !== undefined).length === 0 || !isPollOpen()}
+                >
+                  {isSubmitting 
+                    ? 'Submitting...' 
+                    : currentPeriodName 
+                      ? `Cast ${currentPeriodName} Ballot` 
+                      : 'Cast Ballot'}
+                </button>
+                {!isPollOpen() && currentPeriodName && (
+                  <div
+                    style={{
+                      position: 'relative',
+                      display: 'inline-block',
+                      cursor: 'help',
+                    }}
+                    onMouseEnter={(e) => {
+                      const tooltip = e.currentTarget.querySelector('[data-tooltip]') as HTMLElement;
+                      if (tooltip) tooltip.style.opacity = '1';
+                    }}
+                    onMouseLeave={(e) => {
+                      const tooltip = e.currentTarget.querySelector('[data-tooltip]') as HTMLElement;
+                      if (tooltip) tooltip.style.opacity = '0';
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: '#ffc107',
+                        color: '#856404',
+                        textAlign: 'center',
+                        lineHeight: '28px',
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      ⚠
+                    </span>
+                    <div
+                      data-tooltip
+                      style={{
+                        position: 'absolute',
+                        bottom: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        marginBottom: '8px',
+                        padding: '8px 12px',
+                        background: '#333',
+                        color: 'white',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        opacity: 0,
+                        pointerEvents: 'none',
+                        transition: 'opacity 0.2s',
+                        zIndex: 1000,
+                        whiteSpace: 'nowrap',
+                        textAlign: 'center',
+                      }}
+                    >
+                      Polls are not open for {currentPeriodName}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          border: '6px solid transparent',
+                          borderTopColor: '#333',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              {pollOpenDt && pollCloseDt && (
+                <div style={{ marginTop: '10px', fontSize: '14px', color: '#666', textAlign: 'center' }}>
+                  Polls open: {new Date(pollOpenDt).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  })} to {new Date(pollCloseDt).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

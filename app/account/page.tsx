@@ -348,14 +348,14 @@ export default function AccountPage() {
 
   if (isLoading) {
     return (
-      <div className="container" style={{ maxWidth: '1200px', marginTop: '60px', textAlign: 'center' }}>
+      <div className="container" style={{ maxWidth: '1200px', marginTop: '20px', textAlign: 'center' }}>
         <p>Loading account information...</p>
       </div>
     );
   }
 
   return (
-    <div className="container" style={{ maxWidth: '1200px', marginTop: '60px' }}>
+    <div className="container" style={{ maxWidth: '1200px', marginTop: '20px' }}>
       <header style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: '32px' }}>Account Settings</h1>
         <div>
