@@ -9,3 +9,27 @@ pword: ESPNSucks!!!
 Brevo - Email Service
 uname: americas.cfb.rankings@gmail.com
 pwword: Ironman2015!
+
+Create RDS TestDB w/Public IP:
+Postress, 
+Production, 
+Single-AZ, 
+DB instance identifier: i.e. database-1
+Self managed
+Master password, Confirm master password
+Burstable classes: db-t3-micro
+Storage: General Purpose SSD (gp2), 20 GiB
+Don’t connect to an EC2 compute resource
+VPC - Select your only one
+DB subnet group: Choose the PUBLIC or PRIVATE subnet group
+Public or Private: select according to the subnet group you selected
+
+postgres, Snoqualmie2015!, tdpllc-1.cqgd5zbaiuii.us-west-2.rds.amazonaws.com
+
+
+Step 1: Start the SSH tunnel (required every time):
+
+ssh -i /Users/davidpreston/Documents/project-repos/acfbr/TDPServer1.pem \
+  -L 5432:acfbr.cqgd5zbaiuii.us-west-2.rds.amazonaws.com:5432 \
+  ec2-user@34.215.104.86
+
