@@ -21,6 +21,7 @@ https://www.thesportsdb.com/league/4479-ncaa-division-1
 This needs to be a docker container solution with one container for the app and one for the postgress database.
 
 
-docker-compose build
-docker-compose up -d
+
+docker compose down
+docker compose up -d --build
 

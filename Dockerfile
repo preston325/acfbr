@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# Install CA certificates for SSL connections
+RUN apk add --no-cache ca-certificates
+
 WORKDIR /app
 
 # Copy package files

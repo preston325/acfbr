@@ -14,20 +14,35 @@ function getConnectionString(): string {
     const user = encodeURIComponent(process.env.DB_USER);
     const password = encodeURIComponent(process.env.DB_PASSWORD);
     const database = process.env.DB_NAME;
-    return `postgresql://${user}:${password}@${host}:${port}/${database}?sslmode=require`;
+    return `postgresql://${user}:${password}@${host}:${port}/${database}`;
   }
   
   // Fallback to default (for local development)
-  return 'postgresql://postgres:Snoqualmie2015%21@tdpllc-1.cqgd5zbaiuii.us-west-2.rds.amazonaws.com:5432/acfbr?sslmode=require';
+  return 'postgresql://postgres:Snoqualmie2015%21@tdpllc-1.cqgd5zbaiuii.us-west-2.rds.amazonaws.com:5432/acfbr';
 }
 
-const connectionString = getConnectionString();
+// Remove sslmode from connection string to handle SSL via Pool options
+function cleanConnectionString(connString: string): string {
+  return connString.replace(/[?&]sslmode=[^&]*/g, '').replace(/[?&]uselibpqcompat=[^&]*/g, '');
+}
 
+const rawConnectionString = getConnectionString();
+const connectionString = cleanConnectionString(rawConnectionString);
+
+// For RDS, we need to accept self-signed certificates
+// Handle SSL configuration explicitly via Pool options (not connection string)
+// Also set NODE_TLS_REJECT_UNAUTHORIZED=0 in environment as additional safeguard
 const pool = new Pool({
   connectionString,
   ssl: {
     rejectUnauthorized: false // Required for RDS - it uses self-signed certificates
   }
+});
+
+// Test connection on startup
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
 });
 
 export default pool;

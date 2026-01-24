@@ -3,6 +3,10 @@ import pool from '@/lib/db';
 import { getCurrentUser, hashPassword, generateToken } from '@/lib/auth';
 import { generateVerificationToken, sendVerificationEmail } from '@/lib/email';
 
+// Disable caching for this route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
@@ -35,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     const accountData = accountResult.rows[0] || null;
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       { 
         user: { 
           id: user.id, 
@@ -56,6 +60,13 @@ export async function GET(request: NextRequest) {
       },
       { status: 200 }
     );
+
+    // Add cache control headers to prevent caching
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     console.error('Get account error:', error);
     return NextResponse.json(

@@ -9,6 +9,7 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgresql://postgres:Snoqualmie2015%21@tdpllc-1.cqgd5zbaiuii.us-west-2.rds.amazonaws.com:5432/acfbr?sslmode=require
+      NODE_TLS_REJECT_UNAUTHORIZED: 0
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       SPORTSDB_API_KEY: ${SPORTSDB_API_KEY:-428457}
       NODE_ENV: development

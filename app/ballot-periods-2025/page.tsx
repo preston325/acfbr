@@ -21,9 +21,21 @@ export default function BallotPeriodsPage() {
     fetchBallotPeriods();
   }, []);
 
-  const fetchBallotPeriods = async () => {
+  const fetchBallotPeriods = async (showLoading = true) => {
+    if (showLoading) {
+      setIsLoading(true);
+    }
+    setError(null);
+    
     try {
-      const response = await fetch('/api/ballot-periods');
+      // Add cache-busting parameter to prevent browser caching
+      const response = await fetch(`/api/ballot-periods?_=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+      
       if (response.ok) {
         const data = await response.json();
         setPeriods(data.periods || []);
@@ -35,6 +47,10 @@ export default function BallotPeriodsPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRefresh = () => {
+    fetchBallotPeriods(true);
   };
 
   const formatDateTime = (dateString: string) => {
@@ -87,9 +103,17 @@ export default function BallotPeriodsPage() {
           <Link href="/ballot" className="btn" style={{ marginRight: '10px' }}>
             Your Ballot
           </Link>
-          <Link href="/rankings" className="btn btn-secondary">
+          <Link href="/rankings" className="btn btn-secondary" style={{ marginRight: '10px' }}>
             Rankings
           </Link>
+          <button 
+            onClick={handleRefresh} 
+            className="btn" 
+            style={{ marginLeft: '10px', background: '#28a745', border: '1px solid #28a745' }}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Refreshing...' : 'Refresh Data'}
+          </button>
         </div>
       </header>
 
