@@ -35,3 +35,6 @@ next-env.d.ts
 
 # Credentials
 credentials.txt
+creds.txt
+acfbr.env
+deployment.txt

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
+// Disable caching for this route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   try {
     // Find the current ballot period where the current date falls between poll_open_dt and poll_close_dt
@@ -19,16 +23,24 @@ export async function GET(request: NextRequest) {
       [now]
     );
 
+    let response;
     if (result.rows.length > 0) {
-      return NextResponse.json({
+      response = NextResponse.json({
         period: result.rows[0],
       });
+    } else {
+      // No current period found
+      response = NextResponse.json({
+        period: null,
+      });
     }
-
-    // No current period found
-    return NextResponse.json({
-      period: null,
-    });
+    
+    // Add cache control headers to prevent caching
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     console.error('Error fetching current ballot period:', error);
     return NextResponse.json(

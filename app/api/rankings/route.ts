@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
+// Disable caching for this route  
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Helper function to get current ballot period ID
 async function getCurrentBallotPeriodId(): Promise<number | null> {
   const now = new Date();
@@ -57,10 +61,17 @@ export async function GET(request: NextRequest) {
       total_votes: parseInt(row.total_votes),
     }));
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       rankings,
       ballot_period_id: ballotPeriodId,
     });
+
+    // Add cache control headers to prevent caching
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     console.error('Error fetching rankings:', error);
     return NextResponse.json(
