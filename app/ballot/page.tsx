@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   DndContext,
   closestCenter,
@@ -26,6 +25,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import AppNav from '../components/AppNav';
 import '../globals.css';
 
 interface Team {
@@ -376,6 +376,7 @@ export default function BallotPage() {
   const [currentPeriodName, setCurrentPeriodName] = useState<string | null>(null);
   const [pollOpenDt, setPollOpenDt] = useState<string | null>(null);
   const [pollCloseDt, setPollCloseDt] = useState<string | null>(null);
+  const [availableSearch, setAvailableSearch] = useState('');
 
   // Helper function to sort teams alphabetically
   const sortTeamsAlphabetically = (teamsToSort: Team[]): Team[] => {
@@ -939,6 +940,21 @@ export default function BallotPage() {
     }
   };
 
+  const availableSearchLower = availableSearch.trim().toLowerCase();
+  const filteredAvailableTeams =
+    availableSearchLower === ''
+      ? availableTeams
+      : availableTeams.filter((team) => {
+          const teamName = (team.str_team || team.name || '').toLowerCase();
+          // If only 1 character, match teams that start with that letter (like SQL 'a%')
+          // If 2+ characters, match teams that contain the search text anywhere (like SQL '%search%')
+          if (availableSearchLower.length === 1) {
+            return teamName.startsWith(availableSearchLower);
+          } else {
+            return teamName.includes(availableSearchLower);
+          }
+        });
+
   const handleSubmit = async () => {
     // Build rankings array using actual slot positions (not filtered indices)
     const rankings = rankedTeams
@@ -1002,27 +1018,8 @@ export default function BallotPage() {
   return (
     <div className="container" style={{ maxWidth: '1400px', marginTop: '20px' }}>
       <header style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: '36px' }}>Your Ballot</h1>
-        <div>
-          <Link href="/rankings" className="btn btn-secondary" style={{ marginRight: '10px' }}>
-            Rankings
-          </Link>
-          <Link href="/ballot-periods-2025" className="btn btn-secondary" style={{ marginRight: '10px' }}>
-            Ballot Periods
-          </Link>
-          <Link href="/account" className="btn btn-secondary" style={{ marginRight: '10px' }}>
-            Account
-          </Link>
-          <button
-            onClick={async () => {
-              const response = await fetch('/api/auth/signout', { method: 'POST' });
-              if (response.ok) router.push('/');
-            }}
-            className="btn btn-secondary"
-          >
-            Sign Out
-          </button>
-        </div>
+        <h1 style={{ fontSize: '36px' }}>My Ballot</h1>
+        <AppNav />
       </header>
 
       {error && (
@@ -1053,7 +1050,7 @@ export default function BallotPage() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ fontSize: '24px', margin: 0 }}>
-                Your Top 25 Rankings ({rankedTeams.filter((t): t is Team => t !== undefined).length}/25)
+                My Top 25 Rankings ({rankedTeams.filter((t): t is Team => t !== undefined).length}/25)
               </h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
@@ -1255,14 +1252,47 @@ export default function BallotPage() {
             </div>
           </div>
 
-          <div>
-            <h2 style={{ fontSize: '24px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <h2 style={{ fontSize: '24px', marginBottom: '20px', flexShrink: 0 }}>
               Available Teams ({availableTeams.length})
             </h2>
-            <SortableContext items={availableTeams.map(t => t.id)} strategy={rectSortingStrategy}>
+            <div style={{ flexShrink: 0, marginBottom: '15px', display: 'flex', alignItems: 'center', border: '1px solid #ccc', borderRadius: '6px', backgroundColor: '#fff' }}>
+              <svg
+                aria-hidden
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#888"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ flexShrink: 0, marginLeft: '12px' }}
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+              <input
+                id="available-teams-search"
+                type="text"
+                placeholder="Search teams..."
+                value={availableSearch}
+                onChange={(e) => setAvailableSearch(e.target.value)}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  outline: 'none',
+                  padding: '10px 12px 10px 8px',
+                  fontSize: '16px',
+                  backgroundColor: 'transparent',
+                }}
+                aria-label="Filter available teams"
+              />
+            </div>
+            <SortableContext items={filteredAvailableTeams.map((t) => t.id)} strategy={rectSortingStrategy}>
               <div style={{ maxHeight: '600px', overflowY: 'auto', background: '#f9f9f9', padding: '20px', borderRadius: '8px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '15px' }}>
-                  {availableTeams.map((team) => (
+                  {filteredAvailableTeams.map((team) => (
                     <SortableTeamTile key={team.id} team={team} />
                   ))}
                 </div>

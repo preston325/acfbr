@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import AppNav from '../components/AppNav';
 import '../globals.css';
 
 interface UserType {
@@ -358,20 +359,7 @@ export default function AccountPage() {
     <div className="container" style={{ maxWidth: '1200px', marginTop: '20px' }}>
       <header style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: '32px' }}>Account Settings</h1>
-        <div>
-          <Link href="/ballot" className="btn btn-secondary" style={{ marginRight: '10px' }}>
-            Your Ballot
-          </Link>
-          <button
-            onClick={async () => {
-              const response = await fetch('/api/auth/signout', { method: 'POST' });
-              if (response.ok) router.push('/');
-            }}
-            className="btn btn-secondary"
-          >
-            Sign Out
-          </button>
-        </div>
+        <AppNav />
       </header>
 
       <div style={{ 

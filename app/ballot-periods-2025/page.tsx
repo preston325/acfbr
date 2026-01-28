@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import AppNav from '../components/AppNav';
 import '../globals.css';
 
 interface BallotPeriod {
@@ -49,10 +49,6 @@ export default function BallotPeriodsPage() {
     }
   };
 
-  const handleRefresh = () => {
-    fetchBallotPeriods(true);
-  };
-
   const formatDateTime = (dateString: string) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -94,27 +90,14 @@ export default function BallotPeriodsPage() {
 
   return (
     <div className="container" style={{ maxWidth: '1200px', marginTop: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+        <AppNav />
+      </div>
       <header style={{ marginBottom: '40px', textAlign: 'center' }}>
         <h1 style={{ fontSize: '48px', marginBottom: '20px' }}>Ballot Periods - 2025</h1>
         <p style={{ fontSize: '18px', color: '#666' }}>
           Schedule for when ballots may be cast
         </p>
-        <div style={{ marginTop: '20px' }}>
-          <Link href="/ballot" className="btn" style={{ marginRight: '10px' }}>
-            Your Ballot
-          </Link>
-          <Link href="/rankings" className="btn btn-secondary" style={{ marginRight: '10px' }}>
-            Rankings
-          </Link>
-          <button 
-            onClick={handleRefresh} 
-            className="btn" 
-            style={{ marginLeft: '10px', background: '#28a745', border: '1px solid #28a745' }}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Refreshing...' : 'Refresh Data'}
-          </button>
-        </div>
       </header>
 
       <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
