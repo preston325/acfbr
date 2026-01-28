@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import AppNav from '../components/AppNav';
 import '../globals.css';
 
 interface TeamRanking {
@@ -68,19 +68,14 @@ export default function RankingsPage() {
 
   return (
     <div className="container" style={{ maxWidth: '800px', marginTop: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+        <AppNav />
+      </div>
       <header style={{ marginBottom: '40px', textAlign: 'center' }}>
         <h1 style={{ fontSize: '48px', marginBottom: '20px' }}>Top 25 Rankings</h1>
         <p style={{ fontSize: '18px', color: '#666' }}>
           America's College Football Rankings (ACFBR Poll)
         </p>
-        <div style={{ marginTop: '20px' }}>
-          <Link href="/ballot" className="btn" style={{ marginRight: '10px' }}>
-            Your Ballot
-          </Link>
-          <Link href="/ballot-periods-2025" className="btn btn-secondary">
-            Ballot Periods
-          </Link>
-        </div>
       </header>
 
       <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
