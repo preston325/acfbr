@@ -19,7 +19,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-americas.cfb.rankings@gmail.com}
       APP_URL: ${APP_URL:-http://localhost:3000}
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
+    # Uncomment below for local dev (live-reload; host code overrides image)
+    # volumes:
+    #   - .:/app
+    #   - /app/node_modules
+    #   - /app/.next

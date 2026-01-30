@@ -45,6 +45,10 @@ function SignInForm() {
     if (searchParams.get('email_updated') === 'true') {
       setVerificationMessage('Your email has been updated. Please check your email to verify your new address before signing in.');
     }
+    if (searchParams.get('password_reset') === 'success') {
+      setVerificationMessage('Your password has been updated. You can now sign in.');
+      setTimeout(() => setVerificationMessage(null), 5000);
+    }
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -160,7 +164,12 @@ function SignInForm() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <label htmlFor="password">Password</label>
+              <Link href="/forgot-password" style={{ fontSize: '14px', color: '#0066cc', textDecoration: 'none' }}>
+                Forgot password?
+              </Link>
+            </div>
             <div style={{ position: 'relative' }}>
               <input
                 type={showPassword ? "text" : "password"}

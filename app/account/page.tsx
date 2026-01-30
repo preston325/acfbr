@@ -6,14 +6,21 @@ import Link from 'next/link';
 import AppNav from '../components/AppNav';
 import '../globals.css';
 
-interface UserType {
-  id: number;
-  user_type: string;
-}
-
 interface Team {
   id: number;
   str_team: string;
+}
+
+interface SocialMediaType {
+  id: number;
+  social_media_type: string;
+}
+
+interface SocialHandle {
+  id: number;
+  handle: string;
+  social_media_type_id: number;
+  social_media_type: string;
 }
 
 export default function AccountPage() {
@@ -26,49 +33,42 @@ export default function AccountPage() {
     confirmPassword: '',
   });
   const [accountFormData, setAccountFormData] = useState({
-    user_type_id: '',
     favorite_team_id: '',
-  });
-  const [podcastFormData, setPodcastFormData] = useState({
     podcast_y_n: '',
-    podcast_name: '',
     podcast_url: '',
-    podcast_followers: '',
-    podcast_verified_y_n: '',
+    sports_media_y_n: '',
+    sports_media_url: '',
+    sports_broadcast_y_n: '',
+    sports_broadcast_url: '',
   });
-  const [userTypes, setUserTypes] = useState<UserType[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [socialHandles, setSocialHandles] = useState<SocialHandle[]>([]);
+  const [socialMediaTypes, setSocialMediaTypes] = useState<SocialMediaType[]>([]);
+  const [socialAddForm, setSocialAddForm] = useState({ social_media_type_id: '', handle: '' });
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
   const [success, setSuccess] = useState<Record<string, string | null>>({});
+  const [removingHandleId, setRemovingHandleId] = useState<number | null>(null);
   const [showPassword, setShowPassword] = useState({
     newPassword: false,
     confirmPassword: false,
   });
-  const [showPodcastConfirmation, setShowPodcastConfirmation] = useState(false);
-  const [pendingPodcastUpdate, setPendingPodcastUpdate] = useState<any>(null);
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const [pendingEmailUpdate, setPendingEmailUpdate] = useState<string | null>(null);
   const [originalEmail, setOriginalEmail] = useState<string>('');
+  const [verificationStatus, setVerificationStatus] = useState({
+    podcast_verified_y_n: '',
+    sports_media_verified_y_n: '',
+    sports_broadcast_verified_y_n: '',
+  });
 
   useEffect(() => {
     fetchUserData();
-    fetchUserTypes();
     fetchTeams();
+    fetchSocialHandles();
+    fetchSocialMediaTypes();
   }, []);
-
-  const fetchUserTypes = async () => {
-    try {
-      const response = await fetch('/api/user-types/public');
-      if (response.ok) {
-        const data = await response.json();
-        setUserTypes(data.userTypes);
-      }
-    } catch (error) {
-      console.error('Error fetching user types:', error);
-    }
-  };
 
   const fetchTeams = async () => {
     try {
@@ -82,6 +82,35 @@ export default function AccountPage() {
     }
   };
 
+  const fetchSocialHandles = async () => {
+    try {
+      const response = await fetch('/api/account/social-handles');
+      if (response.ok) {
+        const data = await response.json();
+        setSocialHandles(data.handles ?? []);
+      }
+    } catch (error) {
+      console.error('Error fetching social handles:', error);
+    }
+  };
+
+  const fetchSocialMediaTypes = async () => {
+    try {
+      const response = await fetch('/api/social-media-types/public', { cache: 'no-store' });
+      const data = await response.json();
+      if (response.ok && Array.isArray(data.socialMediaTypes)) {
+        setSocialMediaTypes(
+          data.socialMediaTypes.map((t: { id: number; social_media_type?: string; socialMediaType?: string }) => ({
+            id: Number(t.id),
+            social_media_type: t.social_media_type ?? t.socialMediaType ?? '',
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching social media types:', error);
+    }
+  };
+
   const fetchUserData = async () => {
     try {
       const response = await fetch('/api/account');
@@ -92,15 +121,18 @@ export default function AccountPage() {
         
         if (data.account) {
           setAccountFormData({
-            user_type_id: data.account.user_type_id?.toString() || '',
             favorite_team_id: data.account.favorite_team_id?.toString() || '',
-          });
-          setPodcastFormData({
             podcast_y_n: data.account.podcast_y_n || '',
-            podcast_name: data.account.podcast_name || '',
             podcast_url: data.account.podcast_url || '',
-            podcast_followers: data.account.podcast_followers || '',
+            sports_media_y_n: data.account.sports_media_y_n || '',
+            sports_media_url: data.account.sports_media_url || '',
+            sports_broadcast_y_n: data.account.sports_broadcast_y_n || '',
+            sports_broadcast_url: data.account.sports_broadcast_url || '',
+          });
+          setVerificationStatus({
             podcast_verified_y_n: data.account.podcast_verified_y_n || '',
+            sports_media_verified_y_n: data.account.sports_media_verified_y_n || '',
+            sports_broadcast_verified_y_n: data.account.sports_broadcast_verified_y_n || '',
           });
         }
       } else if (response.status === 401) {
@@ -249,12 +281,29 @@ export default function AccountPage() {
     setErrors({});
 
     try {
-      const updateData: any = {};
-      if (accountFormData.user_type_id) {
-        updateData.user_type_id = parseInt(accountFormData.user_type_id);
+      const updateData: Record<string, unknown> = {};
+      if (accountFormData.favorite_team_id !== undefined && accountFormData.favorite_team_id !== '') {
+        updateData.favorite_team_id = parseInt(accountFormData.favorite_team_id) || null;
+      } else if (accountFormData.favorite_team_id === '') {
+        updateData.favorite_team_id = null;
       }
-      if (accountFormData.favorite_team_id) {
-        updateData.favorite_team_id = parseInt(accountFormData.favorite_team_id);
+      if (accountFormData.podcast_y_n === 'Y' || accountFormData.podcast_y_n === 'N') {
+        updateData.podcast_y_n = accountFormData.podcast_y_n;
+        updateData.podcast_url = accountFormData.podcast_y_n === 'Y' ? (accountFormData.podcast_url || '') : '';
+      }
+      if (accountFormData.sports_media_y_n === 'Y' || accountFormData.sports_media_y_n === 'N') {
+        updateData.sports_media_y_n = accountFormData.sports_media_y_n;
+        updateData.sports_media_url = accountFormData.sports_media_y_n === 'Y' ? (accountFormData.sports_media_url || '') : '';
+      }
+      if (accountFormData.sports_broadcast_y_n === 'Y' || accountFormData.sports_broadcast_y_n === 'N') {
+        updateData.sports_broadcast_y_n = accountFormData.sports_broadcast_y_n;
+        updateData.sports_broadcast_url = accountFormData.sports_broadcast_y_n === 'Y' ? (accountFormData.sports_broadcast_url || '') : '';
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        setErrors({ account: 'No changes to save' });
+        setIsSubmitting(prev => ({ ...prev, account: false }));
+        return;
       }
 
       const response = await fetch('/api/account', {
@@ -270,6 +319,7 @@ export default function AccountPage() {
       if (response.ok) {
         setSuccess(prev => ({ ...prev, account: 'Account info updated successfully!' }));
         setTimeout(() => setSuccess(prev => ({ ...prev, account: null })), 3000);
+        fetchUserData();
       } else {
         setErrors({ account: data.error || 'Failed to update account info' });
       }
@@ -280,71 +330,62 @@ export default function AccountPage() {
     }
   };
 
-  const handlePodcastSubmit = async (e: React.FormEvent) => {
+  const handleSocialAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors(prev => ({ ...prev, social: undefined }));
+    setSuccess(prev => ({ ...prev, social: null }));
 
-    setErrors({});
-
-    // Build update data
-    const updateData: any = {};
-    if (podcastFormData.podcast_y_n) {
-      updateData.podcast_y_n = podcastFormData.podcast_y_n;
-    }
-    if (podcastFormData.podcast_name) {
-      updateData.podcast_name = podcastFormData.podcast_name;
-    }
-    if (podcastFormData.podcast_url) {
-      updateData.podcast_url = podcastFormData.podcast_url;
-    }
-    if (podcastFormData.podcast_followers) {
-      updateData.podcast_followers = podcastFormData.podcast_followers;
+    if (!socialAddForm.social_media_type_id || !socialAddForm.handle.trim()) {
+      setErrors(prev => ({ ...prev, social: 'Select a type and enter a handle' }));
+      return;
     }
 
-    // Show confirmation dialog
-    setPendingPodcastUpdate(updateData);
-    setShowPodcastConfirmation(true);
-  };
-
-  const handlePodcastUpdateConfirm = async () => {
-    setShowPodcastConfirmation(false);
-    setIsSubmitting(prev => ({ ...prev, podcast: true }));
-    setSuccess(prev => ({ ...prev, podcast: null }));
-    setErrors({});
-
+    setIsSubmitting(prev => ({ ...prev, social: true }));
     try {
-      const response = await fetch('/api/account', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(pendingPodcastUpdate),
+      const response = await fetch('/api/account/social-handles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          social_media_type_id: parseInt(socialAddForm.social_media_type_id, 10),
+          handle: socialAddForm.handle.trim(),
+        }),
       });
-
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess(prev => ({ ...prev, podcast: 'Podcast info updated successfully!' }));
-        // Sync podcast_y_n with account form data
-        if (podcastFormData.podcast_y_n) {
-          setAccountFormData(prev => ({ ...prev, podcast_y_n: podcastFormData.podcast_y_n }));
-        }
-        // Refresh user data to get updated verified status
-        await fetchUserData();
-        setTimeout(() => setSuccess(prev => ({ ...prev, podcast: null })), 3000);
+        setSocialHandles(prev => [...prev, data.handle]);
+        setSocialAddForm({ social_media_type_id: '', handle: '' });
+        setSuccess(prev => ({ ...prev, social: 'Handle added.' }));
+        setTimeout(() => setSuccess(prev => ({ ...prev, social: null })), 3000);
       } else {
-        setErrors({ podcast: data.error || 'Failed to update podcast info' });
+        setErrors(prev => ({ ...prev, social: data.error || 'Failed to add handle' }));
       }
     } catch (error) {
-      setErrors({ podcast: 'An error occurred. Please try again.' });
+      setErrors(prev => ({ ...prev, social: 'An error occurred. Please try again.' }));
     } finally {
-      setIsSubmitting(prev => ({ ...prev, podcast: false }));
-      setPendingPodcastUpdate(null);
+      setIsSubmitting(prev => ({ ...prev, social: false }));
     }
   };
 
-  const handlePodcastUpdateCancel = () => {
-    setShowPodcastConfirmation(false);
-    setPendingPodcastUpdate(null);
+  const handleSocialRemove = async (id: number) => {
+    setRemovingHandleId(id);
+    setErrors(prev => ({ ...prev, social: undefined }));
+    try {
+      const response = await fetch(`/api/account/social-handles?id=${id}`, { method: 'DELETE' });
+      const data = await response.json();
+
+      if (response.ok) {
+        setSocialHandles(prev => prev.filter(h => h.id !== id));
+        setSuccess(prev => ({ ...prev, social: 'Handle removed.' }));
+        setTimeout(() => setSuccess(prev => ({ ...prev, social: null })), 3000);
+      } else {
+        setErrors(prev => ({ ...prev, social: data.error || 'Failed to remove handle' }));
+      }
+    } catch (error) {
+      setErrors(prev => ({ ...prev, social: 'An error occurred. Please try again.' }));
+    } finally {
+      setRemovingHandleId(null);
+    }
   };
 
   if (isLoading) {
@@ -363,12 +404,12 @@ export default function AccountPage() {
       </header>
 
       <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(2, 1fr)', 
+        display: 'flex', 
+        flexDirection: 'column',
         gap: '20px',
         marginBottom: '30px'
       }}>
-        {/* Quadrant 1: Update Email */}
+        {/* Section 1: Email */}
         <div style={{ 
           background: 'white', 
           padding: '30px', 
@@ -404,65 +445,7 @@ export default function AccountPage() {
           </form>
         </div>
 
-        {/* Quadrant 2: Account Info */}
-        <div style={{ 
-          background: 'white', 
-          padding: '30px', 
-          borderRadius: '8px', 
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)' 
-        }}>
-          <h2 style={{ fontSize: '20px', marginBottom: '20px' }}>Account Info</h2>
-          
-          {success.account && (
-            <div className="success" style={{ padding: '10px', background: '#d4edda', border: '1px solid #c3e6cb', borderRadius: '6px', marginBottom: '15px', color: '#155724' }}>
-              {success.account}
-            </div>
-          )}
-
-          <form onSubmit={handleAccountInfoSubmit}>
-            <div className="form-group">
-              <label htmlFor="user_type_id">User Type</label>
-              <select
-                id="user_type_id"
-                value={accountFormData.user_type_id}
-                onChange={(e) => setAccountFormData({ ...accountFormData, user_type_id: e.target.value })}
-              >
-                <option value="">Select user type</option>
-                {userTypes.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.user_type}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="favorite_team_id">Favorite Team</label>
-              <select
-                id="favorite_team_id"
-                value={accountFormData.favorite_team_id}
-                onChange={(e) => setAccountFormData({ ...accountFormData, favorite_team_id: e.target.value })}
-              >
-                <option value="">Select favorite team</option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.str_team}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {errors.account && <div className="error" style={{ marginBottom: '15px' }}>{errors.account}</div>}
-
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button type="submit" className="btn" style={{ minWidth: '150px' }} disabled={isSubmitting.account}>
-                {isSubmitting.account ? 'Updating...' : 'Update Account Info'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Quadrant 3: Update Password */}
+        {/* Section 2: Password */}
         <div style={{ 
           background: 'white', 
           padding: '30px', 
@@ -580,115 +563,270 @@ export default function AccountPage() {
           </form>
         </div>
 
-        {/* Quadrant 4: Podcast Information */}
+        {/* Section 3: Account Info */}
         <div style={{ 
           background: 'white', 
           padding: '30px', 
           borderRadius: '8px', 
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-          position: 'relative'
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)' 
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '20px', margin: 0 }}>Podcast Information</h2>
-            {podcastFormData.podcast_y_n === 'Y' && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px',
-                color: podcastFormData.podcast_verified_y_n === 'Y' ? '#28a745' : '#666',
-                fontSize: '12px',
-                fontWeight: '500'
-              }}>
-                <svg 
-                  width="16" 
-                  height="16" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke={podcastFormData.podcast_verified_y_n === 'Y' ? '#28a745' : '#666'}
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
-                  style={podcastFormData.podcast_verified_y_n === 'Y' ? {} : { filter: 'grayscale(100%)' }}
-                >
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <span>{podcastFormData.podcast_verified_y_n === 'Y' ? 'Verified' : 'Unverified'}</span>
-              </div>
-            )}
-          </div>
+          <h2 style={{ fontSize: '20px', marginBottom: '20px' }}>Account Info</h2>
           
-          {success.podcast && (
+          {success.account && (
             <div className="success" style={{ padding: '10px', background: '#d4edda', border: '1px solid #c3e6cb', borderRadius: '6px', marginBottom: '15px', color: '#155724' }}>
-              {success.podcast}
+              {success.account}
             </div>
           )}
 
-          <form onSubmit={handlePodcastSubmit}>
+          <form onSubmit={handleAccountInfoSubmit}>
             <div className="form-group">
-              <label htmlFor="podcast_y_n_podcast">Are you a podcaster?</label>
+              <label>College Football Podcaster</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="podcast_y_n"
+                      checked={accountFormData.podcast_y_n === 'Y'}
+                      onChange={() => setAccountFormData({ ...accountFormData, podcast_y_n: 'Y' })}
+                      style={{ width: 'auto', margin: 0 }}
+                    />
+                    <span>Yes</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="podcast_y_n"
+                      checked={accountFormData.podcast_y_n === 'N' || !accountFormData.podcast_y_n}
+                      onChange={() => setAccountFormData({ ...accountFormData, podcast_y_n: 'N' })}
+                      style={{ width: 'auto', margin: 0 }}
+                    />
+                    <span>No</span>
+                  </label>
+                </div>
+                {(accountFormData.podcast_y_n === 'Y') && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      id="account_podcast_url"
+                      value={accountFormData.podcast_url}
+                      onChange={(e) => setAccountFormData({ ...accountFormData, podcast_url: e.target.value })}
+                      placeholder="Enter podcast name or URL"
+                      style={{ maxWidth: '400px' }}
+                    />
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: verificationStatus.podcast_verified_y_n === 'Y' ? '#16a34a' : '#9ca3af', fontSize: '14px' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      </svg>
+                      {verificationStatus.podcast_verified_y_n === 'Y' ? 'Verified' : 'Unverified'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Sports Media (Newspaper, Magazine, Website)</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="sports_media_y_n"
+                      checked={accountFormData.sports_media_y_n === 'Y'}
+                      onChange={() => setAccountFormData({ ...accountFormData, sports_media_y_n: 'Y' })}
+                      style={{ width: 'auto', margin: 0 }}
+                    />
+                    <span>Yes</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="sports_media_y_n"
+                      checked={accountFormData.sports_media_y_n === 'N' || !accountFormData.sports_media_y_n}
+                      onChange={() => setAccountFormData({ ...accountFormData, sports_media_y_n: 'N' })}
+                      style={{ width: 'auto', margin: 0 }}
+                    />
+                    <span>No</span>
+                  </label>
+                </div>
+                {(accountFormData.sports_media_y_n === 'Y') && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      id="sports_media_url"
+                      value={accountFormData.sports_media_url}
+                      onChange={(e) => setAccountFormData({ ...accountFormData, sports_media_url: e.target.value })}
+                      placeholder="Enter sports media URL"
+                      style={{ maxWidth: '400px' }}
+                    />
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: verificationStatus.sports_media_verified_y_n === 'Y' ? '#16a34a' : '#9ca3af', fontSize: '14px' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      </svg>
+                      {verificationStatus.sports_media_verified_y_n === 'Y' ? 'Verified' : 'Unverified'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Sports Broadcaster (Radio, TV)</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="sports_broadcast_y_n"
+                      checked={accountFormData.sports_broadcast_y_n === 'Y'}
+                      onChange={() => setAccountFormData({ ...accountFormData, sports_broadcast_y_n: 'Y' })}
+                      style={{ width: 'auto', margin: 0 }}
+                    />
+                    <span>Yes</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="sports_broadcast_y_n"
+                      checked={accountFormData.sports_broadcast_y_n === 'N' || !accountFormData.sports_broadcast_y_n}
+                      onChange={() => setAccountFormData({ ...accountFormData, sports_broadcast_y_n: 'N' })}
+                      style={{ width: 'auto', margin: 0 }}
+                    />
+                    <span>No</span>
+                  </label>
+                </div>
+                {(accountFormData.sports_broadcast_y_n === 'Y') && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      id="sports_broadcast_url"
+                      value={accountFormData.sports_broadcast_url}
+                      onChange={(e) => setAccountFormData({ ...accountFormData, sports_broadcast_url: e.target.value })}
+                      placeholder="Enter broadcast URL"
+                      style={{ maxWidth: '400px' }}
+                    />
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: verificationStatus.sports_broadcast_verified_y_n === 'Y' ? '#16a34a' : '#9ca3af', fontSize: '14px' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      </svg>
+                      {verificationStatus.sports_broadcast_verified_y_n === 'Y' ? 'Verified' : 'Unverified'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="favorite_team_id">Favorite Team</label>
               <select
-                id="podcast_y_n_podcast"
-                value={podcastFormData.podcast_y_n}
-                onChange={(e) => {
-                  setPodcastFormData({ ...podcastFormData, podcast_y_n: e.target.value });
-                  setAccountFormData(prev => ({ ...prev, podcast_y_n: e.target.value }));
-                }}
+                id="favorite_team_id"
+                value={accountFormData.favorite_team_id}
+                onChange={(e) => setAccountFormData({ ...accountFormData, favorite_team_id: e.target.value })}
               >
-                <option value="">Select</option>
-                <option value="Y">Yes</option>
-                <option value="N">No</option>
+                <option value="">Select favorite team</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.str_team}
+                  </option>
+                ))}
               </select>
             </div>
 
-            {podcastFormData.podcast_y_n === 'Y' && (
-              <>
-                <div className="form-group">
-                  <label htmlFor="podcast_name">Podcast Name</label>
-                  <input
-                    type="text"
-                    id="podcast_name"
-                    value={podcastFormData.podcast_name}
-                    onChange={(e) => setPodcastFormData({ ...podcastFormData, podcast_name: e.target.value })}
-                    placeholder="Enter podcast name"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="podcast_url">Podcast URL</label>
-                  <input
-                    type="text"
-                    id="podcast_url"
-                    value={podcastFormData.podcast_url}
-                    onChange={(e) => setPodcastFormData({ ...podcastFormData, podcast_url: e.target.value })}
-                    placeholder="Enter podcast URL"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="podcast_followers">Approximate Number of Followers</label>
-                  <input
-                    type="text"
-                    id="podcast_followers"
-                    value={podcastFormData.podcast_followers}
-                    onChange={(e) => setPodcastFormData({ ...podcastFormData, podcast_followers: e.target.value })}
-                    placeholder="Enter approximate number of followers"
-                  />
-                </div>
-              </>
-            )}
-
-            {errors.podcast && <div className="error" style={{ marginBottom: '15px' }}>{errors.podcast}</div>}
+            {errors.account && <div className="error" style={{ marginBottom: '15px' }}>{errors.account}</div>}
 
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button 
-                type="submit" 
-                className="btn" 
-                style={{ minWidth: '150px' }} 
-                disabled={isSubmitting.podcast}
-              >
-                {isSubmitting.podcast ? 'Updating...' : 'Update Podcast Info'}
+              <button type="submit" className="btn" style={{ minWidth: '150px' }} disabled={isSubmitting.account}>
+                {isSubmitting.account ? 'Updating...' : 'Update Account Info'}
               </button>
             </div>
+          </form>
+        </div>
+
+        {/* Section 4: Social Media */}
+        <div style={{
+          background: 'white',
+          padding: '30px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        }}>
+          <h2 style={{ fontSize: '20px', marginBottom: '20px' }}>Social Media</h2>
+
+          {success.social && (
+            <div className="success" style={{ padding: '10px', background: '#d4edda', border: '1px solid #c3e6cb', borderRadius: '6px', marginBottom: '15px', color: '#155724' }}>
+              {success.social}
+            </div>
+          )}
+          {errors.social && <div className="error" style={{ marginBottom: '15px' }}>{errors.social}</div>}
+
+          {socialHandles.length > 0 && (
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', marginBottom: '12px', color: '#374151' }}>Your handles</h3>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {socialHandles.map((h) => (
+                  <li
+                    key={h.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      background: '#f9fafb',
+                      borderRadius: '6px',
+                      marginBottom: '8px',
+                      border: '1px solid #e5e7eb',
+                    }}
+                  >
+                    <span style={{ fontWeight: 500, color: '#374151' }}>{h.social_media_type}</span>
+                    <span style={{ color: '#6b7280' }}>{h.handle}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSocialRemove(h.id)}
+                      disabled={removingHandleId === h.id}
+                      className="btn btn-secondary"
+                      style={{ minWidth: '80px', padding: '6px 12px', fontSize: '14px' }}
+                      aria-label={`Remove ${h.social_media_type} handle ${h.handle}`}
+                    >
+                      {removingHandleId === h.id ? 'Removing...' : 'Remove'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <h3 style={{ fontSize: '16px', marginBottom: '12px', color: '#374151' }}>
+            {socialHandles.length > 0 ? 'Add another handle' : 'Add a handle'}
+          </h3>
+          <form onSubmit={handleSocialAdd} style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
+            <div className="form-group" style={{ marginBottom: 0, minWidth: '180px' }}>
+              <label htmlFor="social_media_type_id">Platform</label>
+              <select
+                id="social_media_type_id"
+                value={socialAddForm.social_media_type_id}
+                onChange={(e) => setSocialAddForm({ ...socialAddForm, social_media_type_id: e.target.value })}
+              >
+                <option value="">Select platform</option>
+                {socialMediaTypes.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.social_media_type || `Platform ${t.id}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0, minWidth: '200px', flex: 1 }}>
+              <label htmlFor="social_handle">Handle</label>
+              <input
+                type="text"
+                id="social_handle"
+                value={socialAddForm.handle}
+                onChange={(e) => setSocialAddForm({ ...socialAddForm, handle: e.target.value })}
+                placeholder="e.g. @username or channel name"
+              />
+            </div>
+            <button type="submit" className="btn" style={{ minWidth: '100px' }} disabled={isSubmitting.social}>
+              {isSubmitting.social ? 'Adding...' : 'Add'}
+            </button>
           </form>
         </div>
       </div>
@@ -742,53 +880,6 @@ export default function AccountPage() {
         </div>
       )}
 
-      {/* Podcast Update Confirmation Dialog */}
-      {showPodcastConfirmation && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'white',
-            padding: '30px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-            maxWidth: '400px',
-            width: '90%'
-          }}>
-            <h3 style={{ marginTop: 0, marginBottom: '15px', fontSize: '18px', color: '#d9534f' }}>
-              Warning
-            </h3>
-            <p style={{ marginBottom: '20px', color: '#333' }}>
-              This action will require Podcast Re-verification, do you wish to proceed?
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                onClick={handlePodcastUpdateCancel}
-                className="btn btn-secondary"
-                style={{ minWidth: '80px' }}
-              >
-                No
-              </button>
-              <button
-                onClick={handlePodcastUpdateConfirm}
-                className="btn"
-                style={{ minWidth: '80px' }}
-              >
-                Yes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
