@@ -121,3 +121,88 @@ export async function sendVerificationEmail(email: string, name: string, token: 
     throw new Error('Failed to send verification email');
   }
 }
+
+/**
+ * Send password reset email with link to update-password page
+ */
+export async function sendPasswordResetEmail(email: string, name: string, token: string): Promise<void> {
+  if (!SMTP_USER || !SMTP_PASSWORD) {
+    console.error('SMTP credentials not configured. Password reset email not sent.');
+    console.log('Password reset link (for development):', `${APP_URL}/update-password?token=${token}`);
+    return;
+  }
+
+  const resetUrl = `${APP_URL}/update-password?token=${token}`;
+
+  const mailOptions = {
+    from: `"ACFBR" <${SMTP_FROM}>`,
+    to: email,
+    subject: 'Reset Your Password - ACFBR',
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h1 style="color: #1a1a1a; margin: 0;">Reset Your Password</h1>
+          </div>
+          
+          <p>Hi ${name},</p>
+          
+          <p>You requested a password reset for your ACFBR account.</p>
+          
+          <p>Click the button below to choose a new password:</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" 
+               style="display: inline-block; background: #007bff; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+              Reset Password
+            </a>
+          </div>
+          
+          <p>Or copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #007bff;">${resetUrl}</p>
+          
+          <p>This link will expire in 1 hour.</p>
+          
+          <p>If you didn't request a password reset, please ignore this email.</p>
+          
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #666;">
+            America's College Football Rankings (ACFBR)<br>
+            Independent voting system for college football pundits
+          </p>
+        </body>
+      </html>
+    `,
+    text: `
+      Hi ${name},
+      
+      You requested a password reset for your ACFBR account.
+      
+      Click the link below to choose a new password:
+      
+      ${resetUrl}
+      
+      This link will expire in 1 hour.
+      
+      If you didn't request a password reset, please ignore this email.
+      
+      ---
+      America's College Football Rankings (ACFBR)
+    `,
+  };
+
+  try {
+    const transporter = getTransporter();
+    await transporter.sendMail(mailOptions);
+    console.log(`Password reset email sent to ${email}`);
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
+    throw new Error('Failed to send password reset email');
+  }
+}

@@ -9,8 +9,9 @@ export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
+    // Identity comes from users table (via auth)
     const user = await getCurrentUser(request);
-    
+
     if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -18,20 +19,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch user_account data
+    // Account info is populated only if a row exists in user_account for this user_id
     const accountResult = await pool.query(
       `SELECT 
-        ua.user_type_id,
-        ut.user_type,
         ua.favorite_team_id,
         t.str_team as favorite_team_name,
         ua.podcast_y_n,
-        ua.podcast_name,
         ua.podcast_url,
         ua.podcast_followers,
-        ua.podcast_verified_y_n
+        ua.podcast_verified_y_n,
+        ua.sports_media_y_n,
+        ua.sports_media_url,
+        ua.sports_media_verified_y_n,
+        ua.sports_broadcast_y_n,
+        ua.sports_broadcast_url,
+        ua.sports_broadcast_verified_y_n
       FROM user_account ua
-      LEFT JOIN user_type ut ON ua.user_type_id = ut.id
       LEFT JOIN teams_ncaa_d1_football t ON ua.favorite_team_id = t.id
       WHERE ua.user_id = $1`,
       [user.id]
@@ -47,15 +50,18 @@ export async function GET(request: NextRequest) {
           email: user.email 
         },
         account: accountData ? {
-          user_type_id: accountData.user_type_id,
-          user_type: accountData.user_type,
           favorite_team_id: accountData.favorite_team_id,
           favorite_team_name: accountData.favorite_team_name,
           podcast_y_n: accountData.podcast_y_n,
-          podcast_name: accountData.podcast_name,
           podcast_url: accountData.podcast_url,
           podcast_followers: accountData.podcast_followers,
           podcast_verified_y_n: accountData.podcast_verified_y_n,
+          sports_media_y_n: accountData.sports_media_y_n,
+          sports_media_url: accountData.sports_media_url,
+          sports_media_verified_y_n: accountData.sports_media_verified_y_n,
+          sports_broadcast_y_n: accountData.sports_broadcast_y_n,
+          sports_broadcast_url: accountData.sports_broadcast_url,
+          sports_broadcast_verified_y_n: accountData.sports_broadcast_verified_y_n,
         } : null
       },
       { status: 200 }
@@ -90,17 +96,21 @@ export async function PUT(request: NextRequest) {
     const { 
       email, 
       password, 
-      user_type_id,
       favorite_team_id,
       podcast_y_n,
-      podcast_name,
       podcast_url,
-      podcast_followers
+      podcast_followers,
+      sports_media_y_n,
+      sports_media_url,
+      sports_broadcast_y_n,
+      sports_broadcast_url
     } = await request.json();
 
     // Validate that at least one field is being updated
-    if (!email && !password && user_type_id === undefined && favorite_team_id === undefined && 
-        podcast_y_n === undefined && podcast_name === undefined && podcast_url === undefined && podcast_followers === undefined) {
+    if (!email && !password && favorite_team_id === undefined && 
+        podcast_y_n === undefined && podcast_url === undefined && podcast_followers === undefined &&
+        sports_media_y_n === undefined && sports_media_url === undefined &&
+        sports_broadcast_y_n === undefined && sports_broadcast_url === undefined) {
       return NextResponse.json(
         { error: 'At least one field must be provided for update' },
         { status: 400 }
@@ -197,9 +207,10 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Handle user_account updates
-    if (user_type_id !== undefined || favorite_team_id !== undefined || 
-        podcast_y_n !== undefined || podcast_name !== undefined || podcast_url !== undefined || podcast_followers !== undefined) {
+    // Handle user_account updates (schema: favorite_team_id, podcast_*, sports_media_*, sports_broadcast_*)
+    if (favorite_team_id !== undefined || podcast_y_n !== undefined || podcast_url !== undefined || podcast_followers !== undefined ||
+        sports_media_y_n !== undefined || sports_media_url !== undefined ||
+        sports_broadcast_y_n !== undefined || sports_broadcast_url !== undefined) {
       
       // Check if user_account record exists
       const existingAccount = await pool.query(
@@ -212,10 +223,6 @@ export async function PUT(request: NextRequest) {
         const insertFields: string[] = ['user_id'];
         const insertValues: any[] = [user.id];
 
-        if (user_type_id !== undefined) {
-          insertFields.push('user_type_id');
-          insertValues.push(user_type_id);
-        }
         if (favorite_team_id !== undefined) {
           insertFields.push('favorite_team_id');
           insertValues.push(favorite_team_id);
@@ -223,10 +230,6 @@ export async function PUT(request: NextRequest) {
         if (podcast_y_n !== undefined) {
           insertFields.push('podcast_y_n');
           insertValues.push(podcast_y_n);
-        }
-        if (podcast_name !== undefined) {
-          insertFields.push('podcast_name');
-          insertValues.push(podcast_name);
         }
         if (podcast_url !== undefined) {
           insertFields.push('podcast_url');
@@ -236,10 +239,21 @@ export async function PUT(request: NextRequest) {
           insertFields.push('podcast_followers');
           insertValues.push(podcast_followers);
         }
-        // If any podcast field is being updated, set verified to 'N'
-        if (podcast_y_n !== undefined || podcast_name !== undefined || podcast_url !== undefined || podcast_followers !== undefined) {
-          insertFields.push('podcast_verified_y_n');
-          insertValues.push('N');
+        if (sports_media_y_n !== undefined) {
+          insertFields.push('sports_media_y_n');
+          insertValues.push(sports_media_y_n);
+        }
+        if (sports_media_url !== undefined) {
+          insertFields.push('sports_media_url');
+          insertValues.push(sports_media_url);
+        }
+        if (sports_broadcast_y_n !== undefined) {
+          insertFields.push('sports_broadcast_y_n');
+          insertValues.push(sports_broadcast_y_n);
+        }
+        if (sports_broadcast_url !== undefined) {
+          insertFields.push('sports_broadcast_url');
+          insertValues.push(sports_broadcast_url);
         }
 
         const insertQuery = `
@@ -253,11 +267,6 @@ export async function PUT(request: NextRequest) {
         const accountValues: any[] = [];
         let accountParamIndex = 1;
 
-        if (user_type_id !== undefined) {
-          accountUpdates.push(`user_type_id = $${accountParamIndex}`);
-          accountValues.push(user_type_id);
-          accountParamIndex++;
-        }
         if (favorite_team_id !== undefined) {
           accountUpdates.push(`favorite_team_id = $${accountParamIndex}`);
           accountValues.push(favorite_team_id);
@@ -267,13 +276,14 @@ export async function PUT(request: NextRequest) {
           accountUpdates.push(`podcast_y_n = $${accountParamIndex}`);
           accountValues.push(podcast_y_n);
           accountParamIndex++;
+          if (podcast_y_n === 'N') {
+            accountUpdates.push('podcast_url = NULL');
+            accountUpdates.push(`podcast_verified_y_n = $${accountParamIndex}`);
+            accountValues.push('N');
+            accountParamIndex++;
+          }
         }
-        if (podcast_name !== undefined) {
-          accountUpdates.push(`podcast_name = $${accountParamIndex}`);
-          accountValues.push(podcast_name);
-          accountParamIndex++;
-        }
-        if (podcast_url !== undefined) {
+        if (podcast_url !== undefined && podcast_y_n !== 'N') {
           accountUpdates.push(`podcast_url = $${accountParamIndex}`);
           accountValues.push(podcast_url);
           accountParamIndex++;
@@ -283,10 +293,36 @@ export async function PUT(request: NextRequest) {
           accountValues.push(podcast_followers);
           accountParamIndex++;
         }
-        // If any podcast field is being updated, set verified to 'N'
-        if (podcast_y_n !== undefined || podcast_name !== undefined || podcast_url !== undefined || podcast_followers !== undefined) {
-          accountUpdates.push(`podcast_verified_y_n = $${accountParamIndex}`);
-          accountValues.push('N');
+        if (sports_media_y_n !== undefined) {
+          accountUpdates.push(`sports_media_y_n = $${accountParamIndex}`);
+          accountValues.push(sports_media_y_n);
+          accountParamIndex++;
+          if (sports_media_y_n === 'N') {
+            accountUpdates.push('sports_media_url = NULL');
+            accountUpdates.push(`sports_media_verified_y_n = $${accountParamIndex}`);
+            accountValues.push('N');
+            accountParamIndex++;
+          }
+        }
+        if (sports_media_url !== undefined && sports_media_y_n !== 'N') {
+          accountUpdates.push(`sports_media_url = $${accountParamIndex}`);
+          accountValues.push(sports_media_url);
+          accountParamIndex++;
+        }
+        if (sports_broadcast_y_n !== undefined) {
+          accountUpdates.push(`sports_broadcast_y_n = $${accountParamIndex}`);
+          accountValues.push(sports_broadcast_y_n);
+          accountParamIndex++;
+          if (sports_broadcast_y_n === 'N') {
+            accountUpdates.push('sports_broadcast_url = NULL');
+            accountUpdates.push(`sports_broadcast_verified_y_n = $${accountParamIndex}`);
+            accountValues.push('N');
+            accountParamIndex++;
+          }
+        }
+        if (sports_broadcast_url !== undefined && sports_broadcast_y_n !== 'N') {
+          accountUpdates.push(`sports_broadcast_url = $${accountParamIndex}`);
+          accountValues.push(sports_broadcast_url);
           accountParamIndex++;
         }
 

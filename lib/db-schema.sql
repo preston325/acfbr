@@ -1,14 +1,15 @@
--- Create user_type table
-CREATE TABLE IF NOT EXISTS user_type (
+-- Create user_types table
+CREATE TABLE IF NOT EXISTS user_types (
   id SERIAL PRIMARY KEY,
   user_type VARCHAR(255) UNIQUE NOT NULL
 );
 
 -- Insert predefined user types
-INSERT INTO user_type (user_type) VALUES 
-  ('College Football Fan'),
+INSERT INTO user_types (user_type) VALUES 
+  ('College Football Fan'),  
   ('College Football Podcaster'),
-  ('College Football Coach or Staff')
+  ('Sports Media Personality (Newspaper, Magazine, Website)'),
+  ('Sports Broadcaster (Radio, TV)')
 ON CONFLICT (user_type) DO NOTHING;
 
 -- Create users table
@@ -20,7 +21,9 @@ CREATE TABLE IF NOT EXISTS users (
   email_verification_token VARCHAR(255),
   password_hash VARCHAR(255) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  password_reset_token VARCHAR(255),
+  password_reset_expires_at TIMESTAMPTZ
 );
 
 -- Create teams_ncaa_d1_football table
@@ -45,23 +48,61 @@ CREATE TABLE IF NOT EXISTS teams_ncaa_d1_football (
 	str_badge_b64 TEXT NULL
 );
 
+-- Create social_media_types table
+CREATE TABLE IF NOT EXISTS social_media_types (
+  id SERIAL PRIMARY KEY,
+  social_media_type VARCHAR(255) UNIQUE NOT NULL
+);
+
+-- Insert predefined social media types
+INSERT INTO social_media_types (social_media_type) VALUES 
+  ('Twitter'),
+  ('Instagram'),
+  ('YouTube'),
+  ('TikTok'),
+  ('Facebook'),
+  ('LinkedIn'),
+  ('Snapchat'),
+  ('Pinterest'),
+  ('Reddit'),
+  ('Discord'),
+  ('Telegram'),
+  ('Other')
+ON CONFLICT (social_media_type) DO NOTHING;
+
+-- Create social_media_handles table
+CREATE TABLE IF NOT EXISTS social_media_handles (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  social_media_type_id INTEGER NOT NULL REFERENCES social_media_types(id) ON DELETE CASCADE,
+  handle VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- social_media_handles indexes
+CREATE INDEX IF NOT EXISTS idx_social_media_handles_user_id ON social_media_handles(user_id);
+CREATE INDEX IF NOT EXISTS idx_social_media_handles_social_media_type_id ON social_media_handles(social_media_type_id);
+
 -- Create user_account table
 CREATE TABLE IF NOT EXISTS user_account (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  user_type_id INTEGER REFERENCES user_type(id),
   favorite_team_id INTEGER REFERENCES teams_ncaa_d1_football(id),
   podcast_y_n CHAR(1) CHECK (podcast_y_n IN ('Y', 'N')),
-  podcast_name VARCHAR(255),
   podcast_url VARCHAR(255),
   podcast_followers INTEGER,
   podcast_verified_y_n CHAR(1) CHECK (podcast_verified_y_n IN ('Y', 'N')),
-  podcast_verified_by VARCHAR(255),
+  sports_media_y_n CHAR(1) CHECK (sports_media_y_n IN ('Y', 'N')),
+  sports_media_url VARCHAR(255),
+  sports_media_verified_y_n CHAR(1) CHECK (sports_media_verified_y_n IN ('Y', 'N')),
+  sports_broadcast_y_n CHAR(1) CHECK (sports_broadcast_y_n IN ('Y', 'N')),
+  sports_broadcast_url VARCHAR(255),
+  sports_broadcast_verified_y_n CHAR(1) CHECK (sports_broadcast_verified_y_n IN ('Y', 'N')),
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- user_account indexes
-CREATE INDEX IF NOT EXISTS idx_user_account_user_type_id ON user_account(user_type_id);
 CREATE INDEX IF NOT EXISTS idx_user_account_favorite_team_id ON user_account(favorite_team_id);
 
 -- Create ballot_types table (predefined ballot types)

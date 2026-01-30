@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import '../globals.css';
+
+type SocialMediaType = { id: number; social_media_type: string };
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -12,7 +14,16 @@ export default function RegisterPage() {
     email: '',
     password: '',
     passwordConfirmation: '',
+    podcast_y_n: '' as '' | 'Y' | 'N',
+    podcast_url: '',
+    sports_media_y_n: '' as '' | 'Y' | 'N',
+    sports_media_url: '',
+    sports_broadcast_y_n: '' as '' | 'Y' | 'N',
+    sports_broadcast_url: '',
+    primary_social_handle: '',
+    social_media_type_id: '' as '' | string,
   });
+  const [socialMediaTypes, setSocialMediaTypes] = useState<SocialMediaType[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState({
@@ -20,6 +31,15 @@ export default function RegisterPage() {
     passwordConfirmation: false,
   });
   const [acknowledgeEmail, setAcknowledgeEmail] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/social-media-types/public')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.socialMediaTypes) setSocialMediaTypes(data.socialMediaTypes);
+      })
+      .catch(() => {});
+  }, []);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -42,6 +62,32 @@ export default function RegisterPage() {
 
     if (formData.password !== formData.passwordConfirmation) {
       newErrors.passwordConfirmation = 'Passwords do not match';
+    }
+
+    if (formData.podcast_y_n !== 'Y' && formData.podcast_y_n !== 'N') {
+      newErrors.podcast_y_n = 'Please select Yes or No';
+    }
+    if (formData.podcast_y_n === 'Y' && !formData.podcast_url.trim()) {
+      newErrors.podcast_url = 'Please enter podcast name or URL';
+    }
+
+    if (formData.sports_media_y_n !== 'Y' && formData.sports_media_y_n !== 'N') {
+      newErrors.sports_media_y_n = 'Please select Yes or No';
+    }
+    if (formData.sports_media_y_n === 'Y' && !formData.sports_media_url.trim()) {
+      newErrors.sports_media_url = 'Please enter sports media URL';
+    }
+
+    if (formData.sports_broadcast_y_n !== 'Y' && formData.sports_broadcast_y_n !== 'N') {
+      newErrors.sports_broadcast_y_n = 'Please select Yes or No';
+    }
+    if (formData.sports_broadcast_y_n === 'Y' && !formData.sports_broadcast_url.trim()) {
+      newErrors.sports_broadcast_url = 'Please enter broadcast URL';
+    }
+
+    const handleTrimmed = formData.primary_social_handle.trim();
+    if (handleTrimmed && !formData.social_media_type_id) {
+      newErrors.social_media_type_id = 'Please select a social media type when providing a handle';
     }
 
     if (!acknowledgeEmail) {
@@ -71,6 +117,14 @@ export default function RegisterPage() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
+          podcast_y_n: formData.podcast_y_n || 'N',
+          podcast_url: formData.podcast_y_n === 'Y' ? formData.podcast_url : '',
+          sports_media_y_n: formData.sports_media_y_n || 'N',
+          sports_media_url: formData.sports_media_y_n === 'Y' ? formData.sports_media_url : '',
+          sports_broadcast_y_n: formData.sports_broadcast_y_n || 'N',
+          sports_broadcast_url: formData.sports_broadcast_y_n === 'Y' ? formData.sports_broadcast_url : '',
+          primary_social_handle: formData.primary_social_handle.trim() || undefined,
+          social_media_type_id: formData.primary_social_handle.trim() ? formData.social_media_type_id || undefined : undefined,
         }),
       });
 
@@ -211,6 +265,155 @@ export default function RegisterPage() {
               </button>
             </div>
             {errors.passwordConfirmation && <div className="error">{errors.passwordConfirmation}</div>}
+          </div>
+
+          <p style={{ marginBottom: '12px', fontWeight: 600, color: '#333' }}>Are you any of the following?</p>
+
+          <div className="form-group">
+            <label>College Football Podcaster</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="podcast_y_n"
+                  checked={formData.podcast_y_n === 'Y'}
+                  onChange={() => setFormData({ ...formData, podcast_y_n: 'Y' })}
+                  style={{ width: 'auto', margin: 0 }}
+                />
+                <span>Yes</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="podcast_y_n"
+                  checked={formData.podcast_y_n === 'N'}
+                  onChange={() => setFormData({ ...formData, podcast_y_n: 'N' })}
+                  style={{ width: 'auto', margin: 0 }}
+                />
+                <span>No</span>
+              </label>
+            </div>
+            {formData.podcast_y_n === 'Y' && (
+              <div style={{ marginTop: '8px' }}>
+                <input
+                  type="text"
+                  id="podcast_url"
+                  value={formData.podcast_url}
+                  onChange={(e) => setFormData({ ...formData, podcast_url: e.target.value })}
+                  placeholder="Enter podcast name or URL"
+                  style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+                />
+                {errors.podcast_url && <div className="error">{errors.podcast_url}</div>}
+              </div>
+            )}
+            {errors.podcast_y_n && <div className="error">{errors.podcast_y_n}</div>}
+          </div>
+
+          <div className="form-group">
+            <label>Sports Media (Newspaper, Magazine, Website)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="sports_media_y_n"
+                  checked={formData.sports_media_y_n === 'Y'}
+                  onChange={() => setFormData({ ...formData, sports_media_y_n: 'Y' })}
+                  style={{ width: 'auto', margin: 0 }}
+                />
+                <span>Yes</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="sports_media_y_n"
+                  checked={formData.sports_media_y_n === 'N'}
+                  onChange={() => setFormData({ ...formData, sports_media_y_n: 'N' })}
+                  style={{ width: 'auto', margin: 0 }}
+                />
+                <span>No</span>
+              </label>
+            </div>
+            {formData.sports_media_y_n === 'Y' && (
+              <div style={{ marginTop: '8px' }}>
+                <input
+                  type="text"
+                  id="sports_media_url"
+                  value={formData.sports_media_url}
+                  onChange={(e) => setFormData({ ...formData, sports_media_url: e.target.value })}
+                  placeholder="Enter sports media URL"
+                  style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+                />
+                {errors.sports_media_url && <div className="error">{errors.sports_media_url}</div>}
+              </div>
+            )}
+            {errors.sports_media_y_n && <div className="error">{errors.sports_media_y_n}</div>}
+          </div>
+
+          <div className="form-group">
+            <label>Sports Broadcaster (Radio, TV)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="sports_broadcast_y_n"
+                  checked={formData.sports_broadcast_y_n === 'Y'}
+                  onChange={() => setFormData({ ...formData, sports_broadcast_y_n: 'Y' })}
+                  style={{ width: 'auto', margin: 0 }}
+                />
+                <span>Yes</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="sports_broadcast_y_n"
+                  checked={formData.sports_broadcast_y_n === 'N'}
+                  onChange={() => setFormData({ ...formData, sports_broadcast_y_n: 'N' })}
+                  style={{ width: 'auto', margin: 0 }}
+                />
+                <span>No</span>
+              </label>
+            </div>
+            {formData.sports_broadcast_y_n === 'Y' && (
+              <div style={{ marginTop: '8px' }}>
+                <input
+                  type="text"
+                  id="sports_broadcast_url"
+                  value={formData.sports_broadcast_url}
+                  onChange={(e) => setFormData({ ...formData, sports_broadcast_url: e.target.value })}
+                  placeholder="Enter broadcast URL"
+                  style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+                />
+                {errors.sports_broadcast_url && <div className="error">{errors.sports_broadcast_url}</div>}
+              </div>
+            )}
+            {errors.sports_broadcast_y_n && <div className="error">{errors.sports_broadcast_y_n}</div>}
+          </div>
+
+          <div className="form-group">
+            <input
+              type="text"
+              id="primary_social_handle"
+              value={formData.primary_social_handle}
+              onChange={(e) => setFormData({ ...formData, primary_social_handle: e.target.value })}
+              placeholder="Primary Social Media Handle"
+              aria-label="Primary Social Media Handle"
+              style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+            />
+            <select
+              id="social_media_type"
+              value={formData.social_media_type_id}
+              onChange={(e) => setFormData({ ...formData, social_media_type_id: e.target.value as '' | string })}
+              aria-label="Social media type"
+              style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', marginTop: '8px', padding: '8px 12px' }}
+            >
+              <option value="">Select social media type</option>
+              {socialMediaTypes.map((t) => (
+                <option key={t.id} value={String(t.id)}>
+                  {t.social_media_type}
+                </option>
+              ))}
+            </select>
+            {errors.social_media_type_id && <div className="error">{errors.social_media_type_id}</div>}
           </div>
 
           <div className="form-group" style={{ marginBottom: '20px' }}>
